@@ -65,26 +65,46 @@ class FactorCalculator:
 
     @ftp.route_types(u'stoch_rsi')
     def calculate_rsi_stoch_rsi(self, df, n=14, m=3):
-        # 计算 LC
-        df['LC'] = df['Close'].shift(1)
+        """
+        计算RSI和随机RSI指标
 
-        # 计算 RSI
-        upward_changes = np.maximum(df['Close'] - df['LC'], 0)
-        downward_changes = np.abs(df['Close'] - df['LC'])
-        avg_gain = upward_changes.rolling(window=n, min_periods=1).mean()
-        avg_loss = downward_changes.rolling(window=n, min_periods=1).mean()
-        df['RSI'] = (avg_gain / avg_loss).apply(lambda x: 100 if x == float('inf') else x)
+        参数:
+        df: pandas DataFrame, 必须包含 'close' 列
+        n: RSI周期，默认14
+        m: 移动平均周期，默认3
 
-        # 计算 Stochastic RSI
-        min_RSI = df['RSI'].rolling(window=n).min()
-        max_RSI = df['RSI'].rolling(window=n).max()
-        df['StochRSI'] = ((df['RSI'] - min_RSI) / (max_RSI - min_RSI) * 100).fillna(0)
+        返回:
+        添加了 'kr' 和 'dr' 列的DataFrame
+        """
+        # 计算前一日收盘价
+        df['pre_close'] = df['Close'].shift(1)
 
-        # 计算 KR 和 DR
-        df['KR'] = df['StochRSI'].rolling(window=m, min_periods=1).mean()
-        df['DR'] = df['KR'].rolling(window=m, min_periods=1).mean()
+        # 计算上涨和下跌的绝对值
+        df['up'] = np.where(df['Close'] > df['pre_close'],
+                            df['Close'] - df['pre_close'], 0)
+        df['down'] = np.where(df['Close'] < df['pre_close'],
+                              abs(df['Close'] - df['pre_close']), 0)
 
-        df.drop(['LC', 'RSI', 'StochRSI'],axis=1, inplace=True)
+        # 计算RSI
+        # 使用ewm来模拟通达信的SMA算法
+        up_avg = df['up'].ewm(alpha=1 / n, min_periods=n).mean()
+        down_avg = df['down'].ewm(alpha=1 / n, min_periods=n).mean()
+
+        df['rsi'] = up_avg / (up_avg + down_avg) * 100
+
+        # 计算随机RSI (STOCHRSI)
+        df['rsi_lowest'] = df['rsi'].rolling(window=n).min()
+        df['rsi_highest'] = df['rsi'].rolling(window=n).max()
+
+        df['stoch_rsi'] = ((df['rsi'] - df['rsi_lowest']) /
+                           (df['rsi_highest'] - df['rsi_lowest'])) * 100
+
+        # 计算KR和DR
+        df['kr'] = df['stoch_rsi'].ewm(alpha=1 / m, min_periods=m).mean()
+        df['dr'] = df['kr'].ewm(alpha=1 / m, min_periods=m).mean()
+
+        # 删除中间计算列
+        df = df.drop(['pre_close', 'up', 'down', 'rsi_lowest', 'rsi_highest', 'rsi', 'stoch_rsi'], axis=1)
 
         return df
 

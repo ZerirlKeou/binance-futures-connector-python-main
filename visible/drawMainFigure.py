@@ -1,6 +1,9 @@
 import finplot as fplt
 import pandas as pd
 
+index = 20
+point_index = 20
+interval = "1m"
 
 
 def fig_config():
@@ -18,8 +21,19 @@ def fig_config():
 
 
 def fig_show():
-    fplt.autoviewrestore()
+    # fplt.autoviewrestore()
     fplt.show()
+
+
+def save():
+    # f = io.BytesIO()
+    # fplt.screenshot(f)
+    # do_something(f)
+    fplt.screenshot(open(f'D:\\quant\\binance1.5.0\\data\\pair_figure\\{interval}\\{index}.jpg', 'wb'))
+
+
+def close_window():
+    fplt.close()
 
 
 class DefTypesPool:
@@ -51,13 +65,26 @@ class MplTypesDraw:
         df_dat.Close.ewm(span=10).mean().plot(ax=ax, legend='EMA')
         df_dat.Close.ewm(span=20).mean().plot(ax=ax, legend='EMA')
 
+    @mpl.route_types(u"kline_label")
+    def kline_plot(self, df_dat, ax):
+        fplt.candlestick_ochl(df_dat[['Open', 'Close', 'High', 'Low']], ax=ax)
+        df_dat.Close.ewm(span=5).mean().plot(ax=ax, legend='EMA')
+        df_dat.Close.ewm(span=10).mean().plot(ax=ax, legend='EMA')
+        df_dat.Close.ewm(span=20).mean().plot(ax=ax, legend='EMA')
+
+        # 标记第5个蜡烛
+        if len(df_dat) >= point_index:
+            print(len(df_dat), point_index)
+            candle_5 = df_dat.iloc[point_index]  # 第5个蜡烛（索引从0开始）
+            fplt.plot(candle_5['Open time'], candle_5['Close'], style='o', width=3, color='#0f0')
+
     @mpl.route_types(u"line")
     def line_plot(self, df_dat, ax):
         fplt.plot(df_dat, ax=ax)
 
     @mpl.route_types(u"bar")
     def bar_plot(self, df_bat, ax):
-        fplt.volume_ocv(df_bat,ax,colorfunc=fplt.strength_colorfilter)
+        fplt.volume_ocv(df_bat, ax, colorfunc=fplt.strength_colorfilter)
 
     @mpl.route_types(u"volume")
     def volume_plot(self, df_dat, ax):
@@ -127,21 +154,22 @@ class MplTypesDraw:
             elif (value == -1) and (skip_days == True):
                 end = df_dat.index.get_loc(kl_index) + 1
                 skip_days = False
-                if df_dat['Close'][end-1] <= df_dat['Close'][start]:
-                    print('end{}'.format(df_dat['Close'][end-1]))
+                if df_dat['Close'][end - 1] <= df_dat['Close'][start]:
+                    print('end{}'.format(df_dat['Close'][end - 1]))
                     print('start{}'.format(df_dat['Close'][start]))
                     pass
                     # fplt.plot(df_dat['Close'][start:end],ax=ax,color='g')
                 else:
-                    fplt.plot(df_dat['Close'][start:end],ax=ax,color='r')
+                    fplt.plot(df_dat['Close'][start:end], ax=ax, color='r')
 
     @mpl.route_types(u"money")
-    def money_trade_back(self,df_dat, ax):
+    def money_trade_back(self, df_dat, ax):
         fplt.plot(df_dat['money'], ax=ax, legend='Money')
 
     @mpl.route_types(u"position")
     def position_trade_back(self, df_dat, ax):
         fplt.plot(df_dat['position'], ax=ax, legend='Position')
+
 
 class MplVisualIf(MplTypesDraw):
 
@@ -187,4 +215,11 @@ class MplVisualIf(MplTypesDraw):
             if i < len(self.draw_kind):
                 view_function = self.mpl.route_output(self.draw_kind[i])
                 view_function(self, df_dat=self.df, ax=self.axes[i])
+        if 'save_number' in kwargs.keys():
+            global index, point_index, interval
+            point_index = kwargs.get('point_index')
+            index = kwargs.get('save_number')
+            interval = kwargs.get('interval')
+            fplt.timer_callback(save, 0.5, single_shot=True)
+            fplt.timer_callback(close_window, 1.0, single_shot=True)
         fig_show()

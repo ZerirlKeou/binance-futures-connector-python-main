@@ -89,19 +89,20 @@ def insert_data():
     name = 'data\\data_base\\1m\\BTCUSDT.db'
     conn = sqlite3.connect(name)
     # df = pd.read_sql_query("select * from 'BTCUSDT';", conn, dtype='float',index_col='Open time')
-    df = pd.read_sql_query("SELECT * FROM 'BTCUSDT' ORDER BY 'Open time' DESC;", conn, dtype='float',
-                           index_col='Open time')
+    # df = pd.read_sql_query("SELECT * FROM 'BTCUSDT' ORDER BY 'Open time' DESC;", conn, dtype='float',
+    #                        index_col='Open time')
+    print(pd.read_sql_query("SELECT COUNT(*) FROM 'BTCUSDT';", con=conn))
 
-    df['Open time'] = (df.index.astype(np.int64) // 10 ** 3).astype(int)
+    # df['Open time'] = (df.index.astype(np.int64) // 10 ** 3).astype(int)
 
     # 散点图绘制
     # chart = ds.show_feature_img(df, "low-open", "Return_1", draw_number=200)
     # chart.show_chart()
     # 主图绘制
-    layout_dict = {'df': df,
-                   'draw_kind': ['kline','macd','basic_Open_point', 'macd_back_time_series'],
-                   'title': u"BTCUSDT"}
-    app.fig_output(**layout_dict)
+    # layout_dict = {'df': df,
+    #                'draw_kind': ['kline','macd','basic_Open_point', 'macd_back_time_series'],
+    #                'title': u"BTCUSDT"}
+    # app.fig_output(**layout_dict)
 
 
 def test_calculate_indicator():

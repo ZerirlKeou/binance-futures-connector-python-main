@@ -1,13 +1,16 @@
+"""
+计算全部因子的IC值，即信息系数(Information Coefficient)
+在每一个数据库中IC给一个表，IR给一个表
+"""
 import json
 import sqlite3
 import pandas as pd
 import os
 
-from cv2.version import rolling
-
 current_dir = os.path.dirname(os.path.abspath(__file__))
 parent_dir = os.path.dirname(current_dir)
 pool_path = os.path.join(parent_dir, "data\\future_pool.json")
+
 
 def json_to_str():
     """
@@ -18,7 +21,7 @@ def json_to_str():
         pair_index = json.load(load_f)
     return pair_index
 
-def calculate_performance(df, conn, pair, indicator_col='macd_back', periods=None):
+def calculate_ic(df, conn, pair, indicator_col, periods=None):
     if periods is None:
         periods = [1, 2, 3, 4, 5]
     results = {'pair':[], 'Period': [], 'Long Wins': [], 'Short Wins': [], 'Total Wins': [],
@@ -31,8 +34,6 @@ def calculate_performance(df, conn, pair, indicator_col='macd_back', periods=Non
         long_condition_len = len(df[df[indicator_col] > 0])
         short_condition_len = len(df[df[indicator_col] < 0])
 
-        rolling_ic = df[f'Return_{period}'].corr(df[indicator_col])
-        print(rolling_ic)
         long_wins = df[long_condition][f'Return_{period}'].gt(0).sum()
         short_wins = df[short_condition][f'Return_{period}'].lt(0).sum()
         total_wins = long_wins + short_wins
@@ -66,6 +67,7 @@ def calculate_performance(df, conn, pair, indicator_col='macd_back', periods=Non
     results_df = pd.DataFrame(results)
     results_df.to_sql(indicator_col, conn, index=False, if_exists='append')
 
+
 def calculate_rate(interval, conn2, pair, name):
     """
     Args:
@@ -75,33 +77,34 @@ def calculate_rate(interval, conn2, pair, name):
         name: 测试的指标名字
     Returns: 返回测试胜率的平均值
     """
-    data_folder = "data\\data_base\\{}\\{}.db".format(interval,pair)
+    data_folder = "data\\data_base\\{}\\{}.db".format(interval, pair)
     data_folder_path = os.path.join(parent_dir, data_folder)
     conn = sqlite3.connect(data_folder_path)
     try:
         df = pd.read_sql_query("select * from {};".format(pair), conn, dtype='float')
-        calculate_performance(df, conn2, pair, indicator_col=name)
+        calculate_IC(df, conn2, pair, indicator_col=name)
     except:
         print(u'{} database has not create, and it will be created soon'.format(pair))
 
 
 def test():
     intervals = ['1m', '5m', '15m', '1h', '1d']
-    # 上次训练，如有更改则再次添加
-    names = ['basic_Open_point', 'macd_back', 'cci_open_point', 'rsiBuy', 'basic_open_plus', 'macd_back_time_series']
+    # 因子库,该函数与因子评估不同，属于因子评估的迭代版本，要实现对于因子的一个科学的度量方法，先记录进入数据库，再进行可视化显示
+    factor_pool = ['basic_Open_point', 'macd_back', 'cci_open_point', 'rsiBuy', 'basic_open_plus',
+                   'macd_back_time_series']
     pairs = json_to_str()
-    for interval in intervals:
-        factor_data_path = os.path.join(parent_dir, "data\\factor_base\\{}.db".format(interval))
+
+    for factor in factor_pool:
+        factor_data_path = os.path.join(parent_dir, "data\\IC_base\\{}.db".format(factor))
         conn = sqlite3.connect(factor_data_path)
         cursor = conn.cursor()
-        for name in names:
-            try:
-                cursor.execute(f"DELETE FROM {name};")
-                conn.commit()
-            except:
-                pass
+        try:
+            cursor.execute(f"DELETE FROM {"IC"};")
+            cursor.execute(f"DELETE FROM {"IR"};")
+            conn.commit()
+        except:
+            pass
+        for interval in intervals:
             for pair in pairs:
-                calculate_rate(interval=interval, conn2=conn,pair=pair, name=name)
+                calculate_rate(interval=interval, conn2=conn, pair=pair, name=name)
         conn.close()
-
-
